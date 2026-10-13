@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://kit.fontawesome.com/57387ebeaa.js" crossorigin="anonymous"></script>
+    <title>Restaurant</title>
+</head>
+<body>
+
+    <script src="script.js"></script>
+
+    <div id="restaurant-app">
+    <!-- ===== HEADER — slide depuis le haut (CSS animation) ===== -->
+    <header>
+        <div class="logo">
+            <h1>La Hun<span>Gote</span></h1>
+        </div>
+
+        <button class="header-cart" type="button" aria-label="Ouvrir le panier" @click="cartOpen = true">
+            <i class="fa-solid fa-cart-shopping"></i>
+            <span v-if="cartCount" class="cart-count" aria-live="polite">{{ cartCount }}</span>
+        </button>
+        <button class="sidebar-toggle" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="site-sidebar">
+            <i class="fa-solid fa-bars" aria-hidden="true"></i>
+        </button>
+    </header>
+
+    <button class="sidebar-backdrop" type="button" aria-label="Fermer le menu" hidden></button>
+    <aside class="sidebar" id="site-sidebar" aria-label="Menu de navigation" aria-hidden="true">
+        <div class="sidebar-heading">
+            <h2>Navigation</h2>
+            <button class="sidebar-close" type="button" aria-label="Fermer le menu">&times;</button>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="#accueil">Accueil</a></li>
+                <li><a href="#menu">Menu</a></li>
+                <li><a href="#services">Services</a></li>
+                <li><a href="#a-propos">Sur nous</a></li>
+                <li><a href="#contact">Contact</a></li>
+            </ul>
+        </nav>
+        <button class="sidebar-logout" type="button">Déconnecter</button>
+    </aside>
+
+
+    <!-- ===== HOME — texte depuis la gauche, image depuis la droite ===== -->
+    <section class="home" id="accueil">
+
+        <div class="image">
+            <!-- slide depuis la droite + flottement en boucle après -->
+            <img src="service2.jpg" alt="" data-anim="right">
+        </div>
+
+        <div class="welcome">
+            <h2 data-anim="left">Bienvenue chez la Hun<span>Gote !</span><br></h2>
+            <p  data-anim="left" data-delay="2">
+                Découvrez notre univers et laissez-vous tenter <br>
+                par une cuisine authentique et faite maison,<br>
+                préparée avec passion pour un moment de partage inoubliable.
+            </p>
+        </div>
+
+        <button class="bton1" data-anim="up" data-delay="4">En savoir plus</button>
+        <button class="bton2" data-anim="up" data-delay="5">Explorer</button>
+
+    </section>
+
+
+    <!-- ===== MENU — titres en fadeUp, cartes en cascade ===== -->
+    <section class="menu" id="menu">
+
+        <h1 data-anim="up">Menu</h1>
+        <h2 data-anim="up" data-delay="1">Les Chauds Bouillants</h2>
+        <p  data-anim="up" data-delay="2">
+            Des recettes de saison, des produits bruts, et une cuisine authentique et <br>
+            faite maison, préparée avec passion pour chaque assiette.
+        </p>
+        <label class="menu-search">
+            <span class="visually-hidden">Rechercher un plat</span>
+            <input v-model.trim="searchQuery" type="search" placeholder="Rechercher votre plat">
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+        </label>
+        <div class="menu-filters" aria-label="Filtrer les plats">
+            <button
+                v-for="category in categories"
+                :key="category"
+                type="button"
+                :class="{ 'is-active': activeCategory === category }"
+                :aria-pressed="activeCategory === category"
+                @click="activeCategory = category">
+                {{ category }}
+            </button>
+        </div>
+
+        <div class="plat">
+            <div
+                v-for="(product, index) in filteredProducts"
+                :key="product.id"
+                class="box"
+                data-anim="up"
+                :data-delay="(index % 8) + 1">
+                <img :src="product.image" :alt="product.name">
+                <h2>{{ product.name }}</h2>
+                <i v-for="star in product.rating" :key="star" class="fa-solid fa-star" aria-hidden="true"></i>
+                <p>{{ formatPrice(product.price) }}</p>
+                <button class="bouton" type="button" @click="addToCart(product)">
+                    <i class="fa-solid fa-cart-shopping" aria-hidden="true"></i>Ajouter
+                </button>
+            </div>
+        </div>
+        <p v-if="filteredProducts.length === 0" class="menu-empty">Aucun plat ne correspond à votre recherche.</p>
+    </section>
+    <Transition name="toast">
+        <div v-if="notification" class="cart-toast" role="status" aria-live="polite">
+            <i class="fa-solid fa-circle-check" aria-hidden="true"></i>{{ notification }}
+        </div>
+    </Transition>
+    <Transition name="cart">
+        <div v-if="cartOpen" class="cart-overlay" @click.self="cartOpen = false">
+            <section class="cart-panel" role="dialog" aria-modal="true" aria-labelledby="cart-title">
+                <div class="cart-heading">
+                    <h2 id="cart-title">Mon panier ({{ cartCount }})</h2>
+                    <button type="button" class="cart-close" aria-label="Fermer le panier" @click="cartOpen = false">&times;</button>
+                </div>
+                <p v-if="cart.length === 0" class="cart-empty">Votre panier est vide.</p>
+                <div v-else class="cart-items">
+                    <article v-for="item in cart" :key="item.id" class="cart-item">
+                        <img :src="item.image" :alt="item.name">
+                        <div class="cart-item-info">
+                            <h3>{{ item.name }}</h3>
+                            <p>{{ formatPrice(item.price * item.quantity) }}</p>
+                            <div class="cart-quantity">
+                                <button type="button" :aria-label="`Retirer une portion de ${item.name}`" @click="changeQuantity(item, -1)">−</button>
+                                <span>{{ item.quantity }}</span>
+                                <button type="button" :aria-label="`Ajouter une portion de ${item.name}`" @click="changeQuantity(item, 1)">+</button>
+                                <button type="button" class="cart-remove" :aria-label="`Supprimer ${item.name} du panier`" @click="removeFromCart(item.id)">Supprimer</button>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+                <div v-if="cart.length" class="cart-total">
+                    <strong>Total</strong><strong>{{ formatPrice(cartTotal) }}</strong>
+                </div>
+                <button v-if="cart.length" type="button" class="cart-checkout" @click="goToCheckout">Finaliser la commande</button>
+                <p class="cart-note">Le panier reste disponible pendant cette visite. Les commandes ne sont pas envoyées.</p>
+            </section>
+        </div>
+    </Transition>
+    </div>
+
+
+    <!-- ===== SERVICES — cartes en scale avec stagger ===== -->
+    <section class="service" id="services">
+
+        <h1 data-anim="fade">Services</h1>
+
+        <div class="boxs" data-anim="scale" data-delay="1">
+            <img src="icone1.jpg" alt="">
+            <h2>Qualité de Nourriture</h2>
+            <p>Chaque ingrédient est sélectionné avec la plus grande exigence,<br>
+pour garantir une fraîcheur irréprochable et un goût authentique.<br>
+Notre cuisine célèbre le mariage des saveurs et du fait-maison,<br>
+afin d'offrir à vos convives une expérience culinaire mémorable.</p>
+        </div>
+
+        <div class="boxs" data-anim="scale" data-delay="2">
+            <img src="icone2.png" alt="">
+            <h2>Chefs de Cuisine</h2>
+            <p>Guidés par l'amour du produit et l'exigence du geste juste,<br>
+nos chefs orchestrent chaque jour une partition de saveurs authentiques.<br>
+Entre créativité audacieuse et respect des traditions culinaires,<br>
+</p>
+        </div>
+
+        <div class="boxs" data-anim="scale" data-delay="3">
+            <img src="icone8.jpg" alt="">
+            <h2>Livraison Rapide</h2>
+            <p>De la validation de votre panier jusqu'à son arrivée chez vous,<br>
+chaque commande bénéficie d'un suivi et d'une préparation express.<br>
+Nos coursiers parcourent la ville sans perdre une seule seconde,<br>
+pour vous livrer des plats chauds et impeccables en un temps record.</p>
+        </div>
+
+        <div class="boxs" data-anim="scale" data-delay="4">
+            <img src="icone4.jpg" alt="">
+            <h2>24h/24 Disponibles</h2>
+            <p>Jour et nuit, nos fourneaux restent allumés pour répondre à vos envies,<br>
+garantissant une disponibilité totale à toute heure du jour et de la nuit.<br>
+Qu'il soit minuit ou midi, notre équipe s'organise sans interruption,<br>
+pour vous préparer et vous livrer des plats d'une fraîcheur absolue en continu.</p>
+        </div>
+
+    </section>
+
+
+    <!-- ===== À PROPOS — image depuis la gauche, texte depuis la droite ===== -->
+    <section class="about" id="a-propos">
+
+        <h1 data-anim="up">A propos de nous</h1>
+
+        <div class="container">
+            <img src="spaghetti.jpg" alt="" data-anim="left">
+            <h2 data-anim="right" data-delay="2">Pourquoi nous choisir ?</h2>
+            <p  data-anim="right" data-delay="3">
+                Entre chefs passionnés, cuisine de qualité et service 24h/24,<br>
+                nous unissons exigence du goût et rapidité d'exécution absolue.<br>
+                De la préparation minutieuse de vos plats jusqu'à votre porte,<br>
+                chaque détail est pensé pour faire de votre repas une expérience unique.
+            </p>
+            <button class="btn10" data-anim="up" data-delay="4">En savoir plus</button>
+        </div>
+
+    </section>
+
+
+    <!-- ===== COMMANDER — image depuis la gauche, formulaire depuis la droite ===== -->
+    <section class="commande">
+
+        <h1 data-anim="up">Commander dès Maintenant</h1>
+        <img src="commande3.jpg" alt="" data-anim="left" data-delay="1">
+
+        <form class="formulaire" method="post" action="#" data-anim="right" data-delay="2">
+            <fieldset>
+
+                <div class="champ">
+                    <label for="order-name">Nom</label>
+                    <input id="order-name" name="name" type="text" placeholder="Votre nom" autocomplete="name" required minlength="2" maxlength="100">
+                </div>
+
+                <div class="champ">
+                    <label for="order-address">Adresse</label>
+                    <input id="order-address" name="address" type="text" placeholder="Votre adresse" autocomplete="street-address" required minlength="5" maxlength="250">
+                </div>
+
+                <div class="champ">
+                    <label for="order-phone">Numéro de téléphone</label>
+                    <input id="order-phone" name="phone" type="tel" placeholder="Numéro de téléphone" autocomplete="tel" required minlength="5" maxlength="30">
+                </div>
+
+                <div class="champ">
+                    <label for="order-email">Email</label>
+                    <input id="order-email" name="email" type="email" placeholder="Votre email" autocomplete="email" required maxlength="254">
+                </div>
+
+                <div class="btn-form">
+                    <button class="btn-com" type="submit">Commander</button>
+                </div>
+
+            </fieldset>
+        </form>
+
+    </section>
+
+
+    <!-- ===== NEWSLETTER — cascade en fadeUp ===== -->
+    <section class="newsletter">
+        <h1 data-anim="up">Newsletter</h1>
+        <h2 data-anim="up" data-delay="1">Inscrivez Vous à notre Newsletter</h2>
+        <p  data-anim="up" data-delay="2">
+            On vous recommande de s'abonner à notre newsletter ,<br>
+            saisissez votre mail pour ne pas louper les nouveautés et actualités sur nous.
+        </p>
+        <input type="email" placeholder="Saisir votre email" data-anim="up" data-delay="3">
+        <button class="valider" data-anim="up" data-delay="4">S'abonner</button>
+    </section>
+
+
+    <!-- ===== FOOTER — colonnes en cascade ===== -->
+    <footer class="footer-main" id="contact">
+
+        <div class="footer-sec" data-anim="up" data-delay="1">
+            <h2>Contact</h2>
+            <p><i class="fa-solid fa-location-dot"></i>Avenue Lamine Gueye,Dakar</p>
+            <p><i class="fa-solid fa-phone"></i>768236500</p>
+            <p class="footer-email"><i class="fa-solid fa-envelope" aria-hidden="true"></i><span>cd4321996@gmail.<br>com</span></p>
+        </div>
+
+        <div class="footer-sec" data-anim="up" data-delay="2">
+            <h2>Service</h2>
+            <p>Livraison Rapide</p>
+            <p>24h/24 Disponibles</p>
+            <p>Evenement</p>
+            <p>Anniversaire</p>
+        </div>
+
+        <div class="footer-sec" data-anim="up" data-delay="3">
+            <h2>Assistance</h2>
+            <p>FàQ</p>
+            <p>Service Client</p>
+            <p>Support d'email</p>
+        </div>
+
+        <div class="footer-sec" data-anim="up" data-delay="4">
+            <h2>Communauté</h2>
+            <i class="fa-brands fa-facebook"></i>
+            <i class="fa-brands fa-instagram"></i>
+            <i class="fa-brands fa-linkedin"></i>
+            <i class="fa-brands fa-whatsapp"></i>
+        </div>
+
+    </footer>
+
+    <p class="last">Tous droits d'auteurs réservés &copy;2026</p>
+
+
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script>
+        const { createApp } = Vue;
+
+        const restaurantApp = createApp({
+            data() {
+                return {
+                    categories: ['Tous', 'Plats', 'Fast-food', 'Desserts', 'Pizzas'],
+                    activeCategory: 'Tous',
+                    searchQuery: '',
+                    cart: [],
+                    cartOpen: false,
+                    notification: '',
+                    notificationTimer: null,
+                    products: [
+                        { id: 1, name: 'Burger', category: 'Fast-food', image: 'burger 1.jpg', rating: 4, price: 2500 },
+                        { id: 2, name: 'Crêpe', category: 'Desserts', image: 'crepe2.jpg', rating: 3, price: 4000 },
+                        { id: 3, name: 'Tacos', category: 'Fast-food', image: 'tacos.jpg', rating: 4, price: 3500 },
+                        { id: 4, name: 'Paella', category: 'Plats', image: 'paella.jpg', rating: 3, price: 5000 },
+                        { id: 5, name: 'Poulet Grillé', category: 'Plats', image: 'poulet1.jpg', rating: 5, price: 3000 },
+                        { id: 6, name: 'Norvégienne', category: 'Pizzas', image: 'norvegienne1.jpg', rating: 3, price: 2000 }
+                    ]
+                };
+            },
+            computed: {
+                filteredProducts() {
+                    const normalize = value => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('fr');
+                    const query = normalize(this.searchQuery);
+                    return this.products.filter(product => {
+                        const matchesCategory = this.activeCategory === 'Tous' || product.category === this.activeCategory;
+                        const matchesSearch = normalize(`${product.name} ${product.category}`).includes(query);
+                        return matchesCategory && matchesSearch;
+                    });
+                },
+                cartCount() {
+                    return this.cart.reduce((count, item) => count + item.quantity, 0);
+                },
+                cartTotal() {
+                    return this.cart.reduce((total, item) => total + item.price * item.quantity, 0);
+                }
+            },
+            watch: {
+                filteredProducts() {
+                    this.$nextTick(() => {
+                        document.querySelectorAll('.plat [data-anim]:not(.in-view)').forEach(element => observer.observe(element));
+                    });
+                }
+            },
+            methods: {
+                formatPrice(price) {
+                    return `${new Intl.NumberFormat('fr-FR').format(price)} F`;
+                },
+                addToCart(product) {
+                    const item = this.cart.find(cartItem => cartItem.id === product.id);
+                    if (item) {
+                        item.quantity += 1;
+                    } else {
+                        this.cart.push({ ...product, quantity: 1 });
+                    }
+                    this.showNotification(`${product.name} ajouté au panier`);
+                },
+                changeQuantity(item, amount) {
+                    item.quantity += amount;
+                    if (item.quantity <= 0) {
+                        this.removeFromCart(item.id);
+                    }
+                },
+                removeFromCart(productId) {
+                    this.cart = this.cart.filter(item => item.id !== productId);
+                },
+                goToCheckout() {
+                    this.cartOpen = false;
+                    this.$nextTick(() => {
+                        document.querySelector('.commande').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    });
+                },
+                showNotification(message) {
+                    this.notification = message;
+                    window.clearTimeout(this.notificationTimer);
+                    this.notificationTimer = window.setTimeout(() => {
+                        this.notification = '';
+                    }, 2800);
+                }
+            }
+        }).mount('#restaurant-app');
+
+        const orderForm = document.querySelector('.formulaire');
+        orderForm.addEventListener('submit', event => {
+            event.preventDefault();
+            restaurantApp.showNotification('L’envoi des commandes est désactivé.');
+        });
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('in-view');
+                    observer.unobserve(entry.target); // animation unique
+                }
+            });
+        }, {
+            threshold: 0.12,          
+            rootMargin: '0px 0px -50px 0px' 
+        });
+
+        
+        document.querySelectorAll('[data-anim]').forEach(el => observer.observe(el));
+
+        const sidebarToggle = document.querySelector('.sidebar-toggle');
+        const sidebar = document.querySelector('.sidebar');
+        const sidebarBackdrop = document.querySelector('.sidebar-backdrop');
+        const sidebarClose = document.querySelector('.sidebar-close');
+
+        function closeSidebar() {
+            sidebar.classList.remove('is-open');
+            sidebarToggle.setAttribute('aria-expanded', 'false');
+            sidebar.setAttribute('aria-hidden', 'true');
+            sidebarBackdrop.hidden = true;
+        }
+
+        sidebarToggle.addEventListener('click', () => {
+            const isOpen = sidebar.classList.toggle('is-open');
+            sidebarToggle.setAttribute('aria-expanded', String(isOpen));
+            sidebar.setAttribute('aria-hidden', String(!isOpen));
+            sidebarBackdrop.hidden = !isOpen;
+        });
+
+        sidebarClose.addEventListener('click', closeSidebar);
+        sidebarBackdrop.addEventListener('click', closeSidebar);
+        sidebar.querySelectorAll('a').forEach(link => link.addEventListener('click', closeSidebar));
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape') {
+                closeSidebar();
+            }
+        });
+        </script>
+
+</body>
+</html>
